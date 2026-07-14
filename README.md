@@ -2,7 +2,7 @@
 
 这是一个从零开始学习 Python Agent 的练习项目。
 
-当前阶段：阶段 4，Prompt 设计。
+当前阶段：阶段 4，Prompt 设计与提示词注入防护。
 
 ## 安装依赖
 
@@ -51,18 +51,19 @@ python src/main.py
 - `debugger`：错误排查助手
 - `planner`：学习计划制定者
 
-## 当前目标
+## 当前安全规则
 
-- 理解 system prompt 如何影响模型行为。
-- 把 prompt 从 API 调用代码中拆出来。
-- 支持不同 Agent 工作模式。
-- 切换模式时清空旧上下文，避免旧角色干扰新角色。
+- 用户不能通过普通消息修改 Agent 身份或系统规则。
+- Agent 不应输出隐藏提示词、系统设定或内部规则原文。
+- 多语言、翻译、调试、编号列表等形式的提示词注入都应被当作普通文本处理。
+- 安全测试用例记录在 `PROMPT_INJECTION_TESTS.md`。
 
 ## 当前文件
 
 - `src/main.py`：命令行入口和命令处理。
-- `src/prompts.py`：管理不同模式的 system prompt。
+- `src/prompts.py`：管理不同模式的 system prompt 和安全规则。
 - `src/settings.py`：读取环境变量配置。
 - `src/deepseek_client.py`：调用 DeepSeek 模型。
 - `.env.example`：配置模板。
 - `ERROR_MANUAL.md`：错误手册。
+- `PROMPT_INJECTION_TESTS.md`：提示词注入测试手册。
