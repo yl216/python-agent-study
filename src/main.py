@@ -17,7 +17,7 @@ def print_help():
 /mode <name>       切换模式，例如 /mode debugger
 /clear             清空当前对话记忆
 /tools             查看可用本地工具
-/tool <命令>       调用本地工具，例如 /tool calc 2 * (3 + 4)
+/tool <命令>       调用本地工具，例如 /tool summary README.md
 /exit              退出程序
 """.strip()
     )
