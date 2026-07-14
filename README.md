@@ -2,7 +2,7 @@
 
 这是一个从零开始学习 Python Agent 的练习项目。
 
-当前阶段：阶段 4，Prompt 设计与提示词注入防护。
+当前阶段：阶段 5，配置与密钥管理强化。
 
 ## 安装依赖
 
@@ -27,6 +27,18 @@ DEEPSEEK_MODEL=deepseek-v4-pro
 DEEPSEEK_TEMPERATURE=0.3
 MAX_HISTORY_TURNS=5
 ```
+
+## 配置说明
+
+| 配置项 | 是否必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `DEEPSEEK_API_KEY` | 是 | 无 | DeepSeek API Key，真实值只放在 `.env` |
+| `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | OpenAI 兼容接口地址 |
+| `DEEPSEEK_MODEL` | 否 | `deepseek-v4-pro` | 使用的模型名 |
+| `DEEPSEEK_TEMPERATURE` | 否 | `0.3` | 随机性，范围 `0.0` 到 `2.0` |
+| `MAX_HISTORY_TURNS` | 否 | `5` | 保留最近几轮对话，范围 `1` 到 `20` |
+
+`.env` 已经被 `.gitignore` 忽略，不会上传到 GitHub。`.env.example` 只保存示例值，可以提交。
 
 ## 运行方式
 
@@ -62,7 +74,7 @@ python src/main.py
 
 - `src/main.py`：命令行入口和命令处理。
 - `src/prompts.py`：管理不同模式的 system prompt 和安全规则。
-- `src/settings.py`：读取环境变量配置。
+- `src/settings.py`：读取并校验环境变量配置。
 - `src/deepseek_client.py`：调用 DeepSeek 模型。
 - `.env.example`：配置模板。
 - `ERROR_MANUAL.md`：错误手册。

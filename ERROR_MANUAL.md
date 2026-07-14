@@ -86,13 +86,106 @@ return Settings(
 修改代码后运行语法检查：
 
 ```powershell
-python -m py_compile src/main.py src/settings.py src/deepseek_client.py
+python -m py_compile src/main.py src/settings.py src/deepseek_client.py src/prompts.py
+```
+
+## 003：缺少 `DEEPSEEK_API_KEY`
+
+### 现象
+
+程序启动失败，并提示：
+
+```text
+请先在 .env 里设置 DEEPSEEK_API_KEY。
+```
+
+### 原因
+
+`.env` 里没有填写真实 API Key，或者仍然保留了示例值：
+
+```text
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+```
+
+### 解决方法
+
+打开 `.env`，把 `DEEPSEEK_API_KEY` 改成你的真实 DeepSeek API Key。
+
+### 如何避免
+
+只把 `.env.example` 提交到 GitHub，不要提交 `.env`。
+
+## 004：`DEEPSEEK_TEMPERATURE` 不是数字
+
+### 现象
+
+程序启动失败，并提示：
+
+```text
+DEEPSEEK_TEMPERATURE 必须是数字，当前值是：abc
+```
+
+### 原因
+
+`.env` 里把温度写成了非数字内容。
+
+### 解决方法
+
+把它改成 `0.0` 到 `2.0` 之间的数字，例如：
+
+```text
+DEEPSEEK_TEMPERATURE=0.3
+```
+
+## 005：`MAX_HISTORY_TURNS` 超出范围
+
+### 现象
+
+程序启动失败，并提示：
+
+```text
+MAX_HISTORY_TURNS 必须在 1 到 20 之间，当前值是：0
+```
+
+### 原因
+
+历史轮数必须是合理的正整数。太小没有记忆，太大可能让请求变慢、变贵、变乱。
+
+### 解决方法
+
+改成 `1` 到 `20` 之间的整数，例如：
+
+```text
+MAX_HISTORY_TURNS=5
+```
+
+## 006：`DEEPSEEK_BASE_URL` 缺少协议
+
+### 现象
+
+程序启动失败，并提示：
+
+```text
+DEEPSEEK_BASE_URL 必须以 http:// 或 https:// 开头，当前值是：api.deepseek.com
+```
+
+### 原因
+
+URL 必须包含协议，否则 SDK 不知道该用什么方式访问。
+
+### 解决方法
+
+改成完整 URL：
+
+```text
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
 ## 常用排查顺序
 
-1. 先运行 `python -m py_compile ...` 检查语法。
+1. 先运行 `python -m py_compile src/main.py src/settings.py src/deepseek_client.py src/prompts.py` 检查语法。
 2. 再运行 `python src/main.py` 看程序是否启动。
 3. 如果没有输出，检查是否调用了 `main()`。
-4. 如果报 API 错误，检查 `.env` 和网络/API Key。
-5. 如果中文显示乱码，优先确认程序功能，再处理终端编码显示。
+4. 如果提示配置错误，检查 `.env`。
+5. 如果报 API 错误，检查 API Key、模型名、余额、网络和 DeepSeek 服务状态。
+6. 如果中文显示乱码，优先确认程序功能，再处理终端编码显示。
