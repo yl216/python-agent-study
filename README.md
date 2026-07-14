@@ -2,7 +2,7 @@
 
 这是一个从零开始学习 Python Agent 的练习项目。
 
-当前阶段：阶段 5，配置与密钥管理强化。
+当前阶段：阶段 6，本地工具调用。
 
 ## 安装依赖
 
@@ -28,18 +28,6 @@ DEEPSEEK_TEMPERATURE=0.3
 MAX_HISTORY_TURNS=5
 ```
 
-## 配置说明
-
-| 配置项 | 是否必填 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `DEEPSEEK_API_KEY` | 是 | 无 | DeepSeek API Key，真实值只放在 `.env` |
-| `DEEPSEEK_BASE_URL` | 否 | `https://api.deepseek.com` | OpenAI 兼容接口地址 |
-| `DEEPSEEK_MODEL` | 否 | `deepseek-v4-pro` | 使用的模型名 |
-| `DEEPSEEK_TEMPERATURE` | 否 | `0.3` | 随机性，范围 `0.0` 到 `2.0` |
-| `MAX_HISTORY_TURNS` | 否 | `5` | 保留最近几轮对话，范围 `1` 到 `20` |
-
-`.env` 已经被 `.gitignore` 忽略，不会上传到 GitHub。`.env.example` 只保存示例值，可以提交。
-
 ## 运行方式
 
 ```powershell
@@ -53,7 +41,27 @@ python src/main.py
 /modes             查看可用模式
 /mode <name>       切换模式，例如 /mode debugger
 /clear             清空当前对话记忆
+/tools             查看可用本地工具
+/tool <命令>       调用本地工具，例如 /tool calc 2 * (3 + 4)
 /exit              退出程序
+```
+
+## 本地工具
+
+```text
+/tool calc <表达式>      计算数学表达式
+/tool time              查看当前时间
+/tool files             列出项目根目录文件
+/tool note <内容>       保存一条学习笔记到 notes/
+```
+
+示例：
+
+```text
+/tool calc 2 * (3 + 4)
+/tool time
+/tool files
+/tool note 今天学习了 Agent 工具调用
 ```
 
 ## 当前模式
@@ -72,7 +80,8 @@ python src/main.py
 
 ## 当前文件
 
-- `src/main.py`：命令行入口和命令处理。
+- `src/main.py`：命令行入口、命令处理和工具命令路由。
+- `src/tools.py`：本地工具函数。
 - `src/prompts.py`：管理不同模式的 system prompt 和安全规则。
 - `src/settings.py`：读取并校验环境变量配置。
 - `src/deepseek_client.py`：调用 DeepSeek 模型。

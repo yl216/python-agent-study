@@ -1,6 +1,7 @@
 from deepseek_client import ask_deepseek
 from prompts import MODE_LABELS, format_modes, get_prompt
 from settings import load_settings
+from tools import ToolError, format_tools, run_tool
 
 
 def trim_history(messages, max_turns):
@@ -15,6 +16,8 @@ def print_help():
 /modes             查看可用模式
 /mode <name>       切换模式，例如 /mode debugger
 /clear             清空当前对话记忆
+/tools             查看可用本地工具
+/tool <命令>       调用本地工具，例如 /tool calc 2 * (3 + 4)
 /exit              退出程序
 """.strip()
     )
@@ -44,6 +47,18 @@ def main():
             continue
         if command == "/modes":
             print(format_modes())
+            continue
+        if command == "/tools":
+            print(format_tools())
+            continue
+        if command.startswith("/tool"):
+            tool_command = user_input.removeprefix("/tool").strip()
+            try:
+                result = run_tool(tool_command)
+            except (ToolError, SyntaxError, ZeroDivisionError) as error:
+                print(f"工具调用失败：{error}")
+                continue
+            print(f"工具结果：\n{result}")
             continue
         if command == "/clear":
             messages = []
