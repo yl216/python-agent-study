@@ -1,4 +1,11 @@
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+PLAN_PATH = DATA_DIR / "current_plan.json"
 
 
 @dataclass
@@ -11,15 +18,20 @@ class PlanStep:
 
 
 class TaskPlan:
-    def __init__(self, goal: str, steps: list[PlanStep]):
+    def __init__(self, goal: str, steps: list[PlanStep], current_index: int = 0):
         self.goal = goal
         self.steps = steps
-        self.current_index = 0
+        self.current_index = current_index
 
     def show(self) -> str:
         lines = [f"任务目标：{self.goal}", ""]
         for index, step in enumerate(self.steps, start=1):
-            status = "完成" if step.done else "进行中" if index - 1 == self.current_index else "待做"
+            if step.done:
+                status = "完成"
+            elif index - 1 == self.current_index and not self.is_complete():
+                status = "进行中"
+            else:
+                status = "待做"
             lines.extend(
                 [
                     f"{index}. [{status}] {step.title}",
@@ -57,6 +69,22 @@ class TaskPlan:
 
     def is_complete(self) -> bool:
         return self.current_index >= len(self.steps)
+
+    def to_dict(self) -> dict:
+        return {
+            "goal": self.goal,
+            "current_index": self.current_index,
+            "steps": [asdict(step) for step in self.steps],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        steps = [PlanStep(**step) for step in data["steps"]]
+        return cls(
+            goal=data["goal"],
+            steps=steps,
+            current_index=int(data.get("current_index", 0)),
+        )
 
 
 def create_learning_plan(goal: str) -> TaskPlan:
@@ -98,6 +126,26 @@ def create_learning_plan(goal: str) -> TaskPlan:
         ),
     ]
     return TaskPlan(goal=goal, steps=steps)
+
+
+def save_plan(plan: TaskPlan) -> None:
+    DATA_DIR.mkdir(exist_ok=True)
+    PLAN_PATH.write_text(
+        json.dumps(plan.to_dict(), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def load_plan() -> TaskPlan | None:
+    if not PLAN_PATH.exists():
+        return None
+    data = json.loads(PLAN_PATH.read_text(encoding="utf-8"))
+    return TaskPlan.from_dict(data)
+
+
+def clear_saved_plan() -> None:
+    if PLAN_PATH.exists():
+        PLAN_PATH.unlink()
 
 
 def _extract_topic(goal: str) -> str:

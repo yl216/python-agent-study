@@ -1,6 +1,6 @@
 from deepseek_client import ask_deepseek
 from intent_parser import IntentParseError, parse_intent, parse_intent_locally
-from planner import create_learning_plan
+from planner import clear_saved_plan, create_learning_plan, load_plan, save_plan
 from prompts import MODE_LABELS, format_modes, get_prompt
 from settings import load_settings
 from tools import ToolError, format_tools, run_tool
@@ -21,10 +21,10 @@ def print_help():
 /tools             查看可用本地工具
 /tool <命令>       手动调用本地工具，例如 /tool summary README.md
 /intent <请求>     让模型输出 JSON 意图并自动调用工具
-/plan <目标>       为学习目标生成步骤计划
+/plan <目标>       为学习目标生成步骤计划，并自动保存
 /plan-show         查看当前计划
-/plan-next         标记当前步骤完成，并进入下一步
-/plan-reset        清空当前计划
+/plan-next         标记当前步骤完成，自动保存，并进入下一步
+/plan-reset        清空当前计划和保存文件
 /exit              退出程序
 """.strip()
     )
@@ -72,9 +72,12 @@ def main():
 
     mode = "teacher"
     messages = []
-    current_plan = None
+    current_plan = load_plan()
+
     print("Python Agent 老师已启动。输入 /help 查看命令。")
     print(f"当前模式：{MODE_LABELS[mode]}")
+    if current_plan:
+        print("已恢复上次未完成的计划。输入 /plan-show 查看。")
 
     while True:
         user_input = input("\n你：").strip()
@@ -101,21 +104,27 @@ def main():
         if command.startswith("/plan "):
             try:
                 current_plan = create_learning_plan(user_input.removeprefix("/plan").strip())
+                save_plan(current_plan)
             except ValueError as error:
                 print(f"计划创建失败：{error}")
                 continue
             print(current_plan.show())
-            print("\n输入 /plan-next 完成当前步骤并进入下一步。")
+            print("\n计划已保存。输入 /plan-next 完成当前步骤并进入下一步。")
             continue
         if command == "/plan-show":
             print(current_plan.show() if current_plan else "当前没有计划。")
             continue
         if command == "/plan-next":
-            print(current_plan.complete_current() if current_plan else "当前没有计划。")
+            if not current_plan:
+                print("当前没有计划。")
+                continue
+            print(current_plan.complete_current())
+            save_plan(current_plan)
             continue
         if command == "/plan-reset":
             current_plan = None
-            print("当前计划已清空。")
+            clear_saved_plan()
+            print("当前计划已清空，保存文件也已删除。")
             continue
         if command == "/clear":
             messages = []

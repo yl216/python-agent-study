@@ -2,7 +2,7 @@
 
 这是一个从零开始学习 Python Agent 的练习项目。
 
-当前阶段：阶段 9，简单任务规划。
+当前阶段：阶段 10，计划持久化。
 
 ## 安装依赖
 
@@ -34,29 +34,33 @@ python src/main.py
 /tools             查看可用本地工具
 /tool <命令>       手动调用本地工具，例如 /tool summary README.md
 /intent <请求>     让模型输出 JSON 意图并自动调用工具
-/plan <目标>       为学习目标生成步骤计划
+/plan <目标>       为学习目标生成步骤计划，并自动保存
 /plan-show         查看当前计划
-/plan-next         标记当前步骤完成，并进入下一步
-/plan-reset        清空当前计划
+/plan-next         标记当前步骤完成，自动保存，并进入下一步
+/plan-reset        清空当前计划和保存文件
 /exit              退出程序
 ```
 
-## 任务规划示例
+## 计划持久化
+
+计划会自动保存到：
 
 ```text
-/plan 学习 Python 函数
-/plan-show
-/plan-next
+data/current_plan.json
 ```
 
-计划会被拆成：
+这个文件是运行状态，不提交到 GitHub。
+
+当你退出程序再重新运行：
+
+```powershell
+python src/main.py
+```
+
+程序会自动读取上次未完成的计划，并提示：
 
 ```text
-1. 理解核心概念
-2. 运行最小示例
-3. 做一个小改造
-4. 完成练习题
-5. 复盘并记录
+已恢复上次未完成的计划。输入 /plan-show 查看。
 ```
 
 ## 当前能力
@@ -69,11 +73,12 @@ python src/main.py
 - Markdown 文件读写
 - 结构化 intent 解析
 - 简单任务规划
+- 计划持久化
 
 ## 当前文件
 
 - `src/main.py`：命令行入口、命令处理、工具、意图和计划命令路由。
-- `src/planner.py`：学习任务规划和步骤推进。
+- `src/planner.py`：学习任务规划、步骤推进、保存和恢复。
 - `src/intent_parser.py`：让模型输出 JSON，并解析为 `intent` 和 `argument`。
 - `src/tools.py`：本地工具函数，包含文件读写工具。
 - `src/prompts.py`：管理不同模式的 system prompt 和安全规则。
