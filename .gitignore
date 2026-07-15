@@ -4,4 +4,6 @@ __pycache__/
 *.pyc
 notes/tool_note_*.md
 notes/summaries/*_summary_*.md
+data/active_plan.json
 data/current_plan.json
+data/plans/*.json
