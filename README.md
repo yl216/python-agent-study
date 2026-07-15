@@ -2,7 +2,7 @@
 
 这是一个从零开始学习 Python Agent 的练习项目。
 
-当前阶段：阶段 8，结构化输出。
+当前阶段：阶段 9，简单任务规划。
 
 ## 安装依赖
 
@@ -34,64 +34,46 @@ python src/main.py
 /tools             查看可用本地工具
 /tool <命令>       手动调用本地工具，例如 /tool summary README.md
 /intent <请求>     让模型输出 JSON 意图并自动调用工具
+/plan <目标>       为学习目标生成步骤计划
+/plan-show         查看当前计划
+/plan-next         标记当前步骤完成，并进入下一步
+/plan-reset        清空当前计划
 /exit              退出程序
 ```
 
-## 结构化输出示例
-
-输入：
+## 任务规划示例
 
 ```text
-/intent 帮我计算 2 * (3 + 4)
+/plan 学习 Python 函数
+/plan-show
+/plan-next
 ```
 
-模型应输出类似 JSON：
-
-```json
-{
-  "intent": "calc",
-  "argument": "2 * (3 + 4)"
-}
-```
-
-程序解析 JSON 后会调用：
+计划会被拆成：
 
 ```text
-/tool calc 2 * (3 + 4)
+1. 理解核心概念
+2. 运行最小示例
+3. 做一个小改造
+4. 完成练习题
+5. 复盘并记录
 ```
 
-如果 DeepSeek 临时连接失败，程序会尝试使用本地规则解析常见意图，避免简单工具完全不可用。
+## 当前能力
 
-## 支持的 intent
-
-```text
-calc            计算数学表达式
-time            查看当前时间
-files           查看项目文件
-note            保存笔记
-read            读取 Markdown 文件
-summary         总结 Markdown 文件
-todos           提取 TODO 或待办项
-save-summary    保存 Markdown 总结
-chat            更适合普通聊天，不调用工具
-```
-
-## 本地工具
-
-```text
-/tool calc <表达式>
-/tool time
-/tool files
-/tool note <内容>
-/tool read <路径>
-/tool summary <路径>
-/tool todos <路径>
-/tool save-summary <路径>
-```
+- 多轮对话记忆
+- Prompt 模式切换
+- 提示词注入防护
+- 配置校验
+- 本地工具调用
+- Markdown 文件读写
+- 结构化 intent 解析
+- 简单任务规划
 
 ## 当前文件
 
-- `src/main.py`：命令行入口、命令处理、工具和意图命令路由。
+- `src/main.py`：命令行入口、命令处理、工具、意图和计划命令路由。
+- `src/planner.py`：学习任务规划和步骤推进。
 - `src/intent_parser.py`：让模型输出 JSON，并解析为 `intent` 和 `argument`。
 - `src/tools.py`：本地工具函数，包含文件读写工具。
 - `src/prompts.py`：管理不同模式的 system prompt 和安全规则。
