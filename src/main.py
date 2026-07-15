@@ -1,13 +1,20 @@
-from conversation_store import clear_conversation, load_conversation, save_conversation
+from conversation_store import (
+    clear_conversation,
+    delete_plan_conversations,
+    load_conversation,
+    save_conversation,
+)
 from deepseek_client import ask_deepseek
 from intent_parser import IntentParseError, parse_intent, parse_intent_locally
 from planner import (
     clear_active_plan,
     create_learning_plan,
+    delete_plan,
     format_plan_list,
+    get_active_mode,
     load_plan,
     save_plan,
-    set_active_plan_id,
+    set_active_state,
 )
 from prompts import MODE_LABELS, format_modes, get_prompt
 from settings import load_settings
@@ -26,20 +33,22 @@ def print_help():
     print(
         """
 命令：
-/help              查看帮助
-/modes             查看可用模式
-/mode <name>       切换模式，例如 /mode debugger
-/clear             清空当前计划的对话记忆
-/tools             查看可用本地工具
-/tool <命令>       手动调用本地工具，例如 /tool summary README.md
-/intent <请求>     让模型输出 JSON 意图并自动调用工具
-/plan <目标>       新建学习计划，保存为独立文件，并设为当前计划
-/plans             查看所有保存的计划
-/plan-use <id>     切换当前计划，并加载该计划的对话历史
-/plan-show         查看当前计划
-/plan-next         标记当前步骤完成，自动保存，并进入下一步
-/plan-reset        取消当前激活计划，不删除历史计划文件
-/exit              退出程序
+/help                    查看帮助
+/modes                   查看可用模式
+/mode <name>             切换模式，并加载当前计划下该模式的对话历史
+/clear                   清空当前计划 + 当前模式的对话记忆
+/tools                   查看可用本地工具
+/tool <命令>             手动调用本地工具，例如 /tool summary README.md
+/intent <请求>           让模型输出 JSON 意图并自动调用工具
+/plan <目标>             新建学习计划，保存为独立文件，并设为当前计划
+/plans                   查看所有保存的计划
+/plan-use <id>           切换当前计划，并加载该计划当前模式的对话历史
+/plan-show               查看当前计划
+/plan-next               标记当前步骤完成，自动保存，并进入下一步
+/plan-reset              取消当前激活计划，不删除历史计划文件
+/plan-delete <id>        预览删除计划
+/plan-delete <id> --yes  确认删除计划和该计划下所有 mode 对话
+/exit                    退出程序
 """.strip()
     )
 
@@ -77,6 +86,15 @@ def handle_intent_command(user_request: str, settings):
     handle_tool_command(tool_command)
 
 
+def parse_delete_command(user_input: str) -> tuple[str, bool]:
+    parts = user_input.split()
+    if len(parts) < 2:
+        return "", False
+    plan_id = parts[1]
+    confirmed = len(parts) >= 3 and parts[2] == "--yes"
+    return plan_id, confirmed
+
+
 def main():
     try:
         settings = load_settings()
@@ -84,22 +102,25 @@ def main():
         print(f"启动失败：{error}")
         return
 
-    mode = "teacher"
+    mode = get_active_mode()
+    if mode not in MODE_LABELS:
+        mode = "teacher"
     current_plan = load_plan()
-    messages = load_conversation(active_plan_id(current_plan))
+    messages = load_conversation(active_plan_id(current_plan), mode)
 
     print("Python Agent 老师已启动。输入 /help 查看命令。")
     print(f"当前模式：{MODE_LABELS[mode]}")
     if current_plan:
         print(f"已恢复当前计划：{current_plan.plan_id}。输入 /plan-show 查看。")
         if messages:
-            print(f"已恢复该计划的 {len(messages)} 条对话消息。")
+            print(f"已恢复该计划在 {MODE_LABELS[mode]} 模式下的 {len(messages)} 条对话消息。")
 
     while True:
         user_input = input("\n你：").strip()
         command = user_input.lower()
 
         if command in {"/exit", "exit", "quit"}:
+            save_conversation(active_plan_id(current_plan), mode, messages)
             print("Agent 老师：下次继续，我们会进入更强的 Agent 能力。")
             break
         if command == "/help":
@@ -118,32 +139,51 @@ def main():
             handle_intent_command(user_input.removeprefix("/intent").strip(), settings)
             continue
         if command.startswith("/plan "):
+            save_conversation(active_plan_id(current_plan), mode, messages)
             try:
                 current_plan = create_learning_plan(user_input.removeprefix("/plan").strip())
-                save_plan(current_plan)
-                messages = []
-                save_conversation(current_plan.plan_id, messages)
+                save_plan(current_plan, mode)
+                messages = load_conversation(current_plan.plan_id, mode)
             except ValueError as error:
                 print(f"计划创建失败：{error}")
                 continue
             print(current_plan.show())
-            print("\n计划已保存为独立文件，并设为当前计划。对话历史已切换到新计划。")
+            print(f"\n计划已保存为独立文件，并设为当前计划。已进入 {MODE_LABELS[mode]} 模式的空对话历史。")
             continue
         if command == "/plans":
             print(format_plan_list())
             continue
         if command.startswith("/plan-use "):
+            save_conversation(active_plan_id(current_plan), mode, messages)
             plan_id = user_input.removeprefix("/plan-use").strip()
             selected_plan = load_plan(plan_id)
             if not selected_plan:
                 print(f"没有找到计划：{plan_id}")
                 continue
             current_plan = selected_plan
-            set_active_plan_id(plan_id)
-            messages = load_conversation(plan_id)
+            set_active_state(plan_id, mode)
+            messages = load_conversation(plan_id, mode)
             print(f"已切换当前计划：{plan_id}")
-            print(f"已加载该计划的 {len(messages)} 条对话消息。")
+            print(f"已加载该计划在 {MODE_LABELS[mode]} 模式下的 {len(messages)} 条对话消息。")
             print(current_plan.current_step())
+            continue
+        if command.startswith("/plan-delete "):
+            plan_id, confirmed = parse_delete_command(user_input)
+            target_plan = load_plan(plan_id)
+            if not target_plan:
+                print(f"没有找到计划：{plan_id}")
+                continue
+            if not confirmed:
+                print(f"将删除计划：{plan_id}")
+                print("这会一并删除该计划下所有 mode 的对话历史。")
+                print(f"确认删除请再次输入：/plan-delete {plan_id} --yes")
+                continue
+            delete_plan(plan_id)
+            delete_plan_conversations(plan_id)
+            if current_plan and current_plan.plan_id == plan_id:
+                current_plan = None
+                messages = []
+            print(f"已删除计划及其所有 mode 对话历史：{plan_id}")
             continue
         if command == "/plan-show":
             print(current_plan.show() if current_plan else "当前没有激活计划。")
@@ -153,9 +193,10 @@ def main():
                 print("当前没有激活计划。")
                 continue
             print(current_plan.complete_current())
-            save_plan(current_plan)
+            save_plan(current_plan, mode)
             continue
         if command == "/plan-reset":
+            save_conversation(active_plan_id(current_plan), mode, messages)
             current_plan = None
             messages = []
             clear_active_plan()
@@ -163,8 +204,8 @@ def main():
             continue
         if command == "/clear":
             messages = []
-            clear_conversation(active_plan_id(current_plan))
-            print("当前计划的对话记忆已清空。")
+            clear_conversation(active_plan_id(current_plan), mode)
+            print(f"当前计划在 {MODE_LABELS[mode]} 模式下的对话记忆已清空。")
             continue
         if command.startswith("/mode "):
             next_mode = command.split(maxsplit=1)[1]
@@ -172,10 +213,13 @@ def main():
                 print("Agent 老师：没有这个模式。")
                 print(format_modes())
                 continue
+            save_conversation(active_plan_id(current_plan), mode, messages)
             mode = next_mode
-            messages = []
-            clear_conversation(active_plan_id(current_plan))
-            print(f"Agent 老师：已切换到 {MODE_LABELS[mode]}，并清空当前计划的旧对话记忆。")
+            if current_plan:
+                set_active_state(current_plan.plan_id, mode)
+            messages = load_conversation(active_plan_id(current_plan), mode)
+            print(f"Agent 老师：已切换到 {MODE_LABELS[mode]}。")
+            print(f"已加载当前计划在该模式下的 {len(messages)} 条对话消息。")
             continue
         if not user_input:
             continue
@@ -193,7 +237,7 @@ def main():
         print(f"\n{MODE_LABELS[mode]}：\n{answer}")
         messages.append({"role": "assistant", "content": answer})
         messages = trim_history(messages, settings.max_history_turns)
-        save_conversation(active_plan_id(current_plan), messages)
+        save_conversation(active_plan_id(current_plan), mode, messages)
 
 
 if __name__ == "__main__":

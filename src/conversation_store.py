@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 
@@ -6,11 +7,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONVERSATIONS_DIR = PROJECT_ROOT / "data" / "conversations"
 
 
-def load_conversation(plan_id: str | None) -> list[dict[str, str]]:
+def load_conversation(plan_id: str | None, mode: str) -> list[dict[str, str]]:
     if not plan_id:
         return []
 
-    path = _conversation_path(plan_id)
+    path = _conversation_path(plan_id, mode)
     if not path.exists():
         return []
 
@@ -27,25 +28,36 @@ def load_conversation(plan_id: str | None) -> list[dict[str, str]]:
     ]
 
 
-def save_conversation(plan_id: str | None, messages: list[dict[str, str]]) -> None:
+def save_conversation(plan_id: str | None, mode: str, messages: list[dict[str, str]]) -> None:
     if not plan_id:
         return
 
-    CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
-    _conversation_path(plan_id).write_text(
-        json.dumps({"plan_id": plan_id, "messages": messages}, ensure_ascii=False, indent=2),
+    path = _conversation_path(plan_id, mode)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"plan_id": plan_id, "mode": mode, "messages": messages},
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
 
-def clear_conversation(plan_id: str | None) -> None:
+def clear_conversation(plan_id: str | None, mode: str) -> None:
     if not plan_id:
         return
 
-    path = _conversation_path(plan_id)
+    path = _conversation_path(plan_id, mode)
     if path.exists():
         path.unlink()
 
 
-def _conversation_path(plan_id: str) -> Path:
-    return CONVERSATIONS_DIR / f"{plan_id}.json"
+def delete_plan_conversations(plan_id: str) -> None:
+    path = CONVERSATIONS_DIR / plan_id
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def _conversation_path(plan_id: str, mode: str) -> Path:
+    return CONVERSATIONS_DIR / plan_id / f"{mode}.json"

@@ -8,3 +8,4 @@ data/active_plan.json
 data/current_plan.json
 data/plans/*.json
 data/conversations/*.json
+data/conversations/*/*.json

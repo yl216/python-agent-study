@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 PLANS_DIR = DATA_DIR / "plans"
 ACTIVE_PLAN_PATH = DATA_DIR / "active_plan.json"
+DEFAULT_MODE = "teacher"
 
 
 @dataclass
@@ -144,13 +145,13 @@ def create_learning_plan(goal: str) -> TaskPlan:
     return TaskPlan(goal=goal, steps=steps)
 
 
-def save_plan(plan: TaskPlan) -> None:
+def save_plan(plan: TaskPlan, mode: str = DEFAULT_MODE) -> None:
     PLANS_DIR.mkdir(parents=True, exist_ok=True)
     _plan_path(plan.plan_id).write_text(
         json.dumps(plan.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    set_active_plan_id(plan.plan_id)
+    set_active_state(plan.plan_id, mode)
 
 
 def load_plan(plan_id: str | None = None) -> TaskPlan | None:
@@ -163,6 +164,16 @@ def load_plan(plan_id: str | None = None) -> TaskPlan | None:
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
     return TaskPlan.from_dict(data)
+
+
+def delete_plan(plan_id: str) -> bool:
+    path = _plan_path(plan_id)
+    if not path.exists():
+        return False
+    path.unlink()
+    if get_active_plan_id() == plan_id:
+        clear_active_plan()
+    return True
 
 
 def list_plans() -> list[TaskPlan]:
@@ -188,22 +199,54 @@ def format_plan_list() -> str:
         lines.append(f"{marker} {plan.plan_id} | {status} | {plan.goal}")
     lines.append("")
     lines.append("使用 /plan-use <id> 切换当前计划。")
+    lines.append("使用 /plan-delete <id> --yes 删除计划和该计划下所有 mode 对话。")
     return "\n".join(lines)
 
 
-def set_active_plan_id(plan_id: str) -> None:
+def set_active_state(plan_id: str, mode: str) -> None:
     DATA_DIR.mkdir(exist_ok=True)
     ACTIVE_PLAN_PATH.write_text(
-        json.dumps({"active_plan_id": plan_id}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {"active_plan_id": plan_id, "active_mode": mode},
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
 
-def get_active_plan_id() -> str | None:
+def set_active_plan_id(plan_id: str) -> None:
+    set_active_state(plan_id, get_active_mode())
+
+
+def set_active_mode(mode: str) -> None:
+    plan_id = get_active_plan_id()
+    if plan_id:
+        set_active_state(plan_id, mode)
+    else:
+        DATA_DIR.mkdir(exist_ok=True)
+        ACTIVE_PLAN_PATH.write_text(
+            json.dumps({"active_plan_id": None, "active_mode": mode}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+
+def get_active_state() -> dict:
     if not ACTIVE_PLAN_PATH.exists():
-        return None
+        return {"active_plan_id": None, "active_mode": DEFAULT_MODE}
     data = json.loads(ACTIVE_PLAN_PATH.read_text(encoding="utf-8"))
-    return data.get("active_plan_id")
+    return {
+        "active_plan_id": data.get("active_plan_id"),
+        "active_mode": data.get("active_mode") or DEFAULT_MODE,
+    }
+
+
+def get_active_plan_id() -> str | None:
+    return get_active_state().get("active_plan_id")
+
+
+def get_active_mode() -> str:
+    return get_active_state().get("active_mode") or DEFAULT_MODE
 
 
 def clear_active_plan() -> None:
