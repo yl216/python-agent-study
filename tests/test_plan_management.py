@@ -88,6 +88,52 @@ class PlanManagementTests(unittest.TestCase):
         self.assertIsNone(planner.get_active_plan_id())
         self.assertEqual(conversation_store.conversation_summary("delete-me"), {})
 
+    def test_rename_plan_rejects_empty_name(self):
+        plan = self.make_plan("keep-me", "keep goal")
+        planner.write_plan(plan)
+
+        with self.assertRaises(ValueError):
+            planner.rename_plan_id("keep-me", "   ")
+
+        self.assertEqual(planner.load_plan("keep-me").goal, "keep goal")
+
+    def test_rename_plan_uses_unique_id_when_target_exists(self):
+        source = self.make_plan("source-plan", "source goal")
+        existing = self.make_plan("learn-functions", "existing goal")
+        planner.write_plan(source)
+        planner.write_plan(existing)
+
+        renamed_plan, old_id, new_id = planner.rename_plan_id("source-plan", "learn functions")
+
+        self.assertEqual(old_id, "source-plan")
+        self.assertEqual(new_id, "learn-functions-2")
+        self.assertEqual(renamed_plan.plan_id, "learn-functions-2")
+        self.assertEqual(planner.load_plan("learn-functions").goal, "existing goal")
+        self.assertEqual(planner.load_plan("learn-functions-2").goal, "learn functions")
+
+    def test_delete_missing_plan_returns_false(self):
+        self.assertFalse(planner.delete_plan("missing-plan"))
+
+    def test_conversations_are_isolated_by_mode(self):
+        conversation_store.save_conversation(
+            "mode-plan",
+            "teacher",
+            [{"role": "user", "content": "teacher message"}],
+        )
+        conversation_store.save_conversation(
+            "mode-plan",
+            "planner",
+            [{"role": "assistant", "content": "planner message"}],
+        )
+
+        conversation_store.clear_conversation("mode-plan", "teacher")
+
+        self.assertEqual(conversation_store.load_conversation("mode-plan", "teacher"), [])
+        self.assertEqual(
+            conversation_store.load_conversation("mode-plan", "planner"),
+            [{"role": "assistant", "content": "planner message"}],
+        )
+
     def make_plan(self, plan_id, goal):
         return TaskPlan(
             goal=goal,
