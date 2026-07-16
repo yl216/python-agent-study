@@ -24,6 +24,14 @@ Copy-Item .env.example .env
 python src/main.py
 ```
 
+## 运行测试
+
+```powershell
+python -m unittest discover -s tests
+```
+
+当前测试重点覆盖计划管理：重命名、对话迁移、删除清理和 active 计划状态。
+
 ## 当前命令
 
 ```text
