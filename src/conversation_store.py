@@ -64,6 +64,24 @@ def conversation_summary(plan_id: str) -> dict[str, int]:
     return summary
 
 
+def rename_plan_conversations(old_plan_id: str, new_plan_id: str) -> None:
+    old_path = CONVERSATIONS_DIR / old_plan_id
+    new_path = CONVERSATIONS_DIR / new_plan_id
+    if not old_path.exists():
+        return
+
+    new_path.parent.mkdir(parents=True, exist_ok=True)
+    if new_path.exists():
+        for source in old_path.glob("*.json"):
+            target = new_path / source.name
+            if not target.exists():
+                source.replace(target)
+        shutil.rmtree(old_path)
+        return
+
+    old_path.replace(new_path)
+
+
 def delete_plan_conversations(plan_id: str) -> None:
     path = CONVERSATIONS_DIR / plan_id
     if path.exists():

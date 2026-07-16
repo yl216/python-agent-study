@@ -203,6 +203,33 @@ def load_plan(plan_id: str | None = None) -> TaskPlan | None:
     return TaskPlan.from_dict(data)
 
 
+def rename_plan_id(plan_id: str, new_goal: str) -> tuple[TaskPlan, str, str]:
+    plan = load_plan(plan_id)
+    if not plan:
+        raise ValueError(f"没有找到计划：{plan_id}")
+
+    new_goal = new_goal.strip()
+    if not new_goal:
+        raise ValueError("新计划名称不能为空。")
+
+    old_id = plan.plan_id
+    new_id = _unique_plan_id(_slug_from_text(new_goal), old_id)
+    old_path = _plan_path(old_id)
+    new_path = _plan_path(new_id)
+
+    plan.goal = new_goal
+    plan.plan_id = new_id
+    write_plan(plan)
+
+    if old_path.exists() and old_path != new_path:
+        old_path.unlink()
+
+    if get_active_plan_id() == old_id:
+        set_active_state(new_id, get_active_mode())
+
+    return plan, old_id, new_id
+
+
 def delete_plan(plan_id: str) -> bool:
     path = _plan_path(plan_id)
     if not path.exists():
@@ -310,12 +337,25 @@ def _plan_path(plan_id: str) -> Path:
 
 
 def _make_plan_id(goal: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", goal.lower()).strip("-")
-    if not slug:
-        slug = "plan"
-    slug = slug[:32].strip("-") or "plan"
+    slug = _slug_from_text(goal)
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
     return f"{timestamp}-{slug}"
+
+
+def _slug_from_text(text: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
+    if not slug:
+        slug = "plan"
+    return slug[:32].strip("-") or "plan"
+
+
+def _unique_plan_id(base_id: str, current_id: str | None = None) -> str:
+    candidate = base_id
+    index = 2
+    while _plan_path(candidate).exists() and candidate != current_id:
+        candidate = f"{base_id}-{index}"
+        index += 1
+    return candidate
 
 
 def _extract_topic(goal: str) -> str:

@@ -39,7 +39,7 @@ python src/main.py
 /plan-use <id>           切换当前计划
 /plan-show               查看当前计划
 /plan-next               标记当前步骤完成
-/plan-rename <id> <名称> 重命名计划
+/plan-rename <id> <名称> 重命名计划，计划 ID 也会改为新名称的 slug
 /plan-done <id>          标记计划完成
 /plan-archive <id>       归档计划
 /plan-export <id>        导出计划为 Markdown
@@ -63,6 +63,26 @@ python src/main.py
 active
 done
 archived
+```
+
+重命名计划会同时更新：
+
+- 计划目标名称
+- 计划 ID
+- `data/plans/<id>.json` 文件名
+- `data/conversations/<id>/` 对话目录
+- 如果它是当前激活计划，也会同步 active 指针
+
+例如：
+
+```text
+/plan-rename 20260716013923-learn-functions learn
+```
+
+会把计划 ID 改成：
+
+```text
+learn
 ```
 
 删除计划需要确认。第一次输入：

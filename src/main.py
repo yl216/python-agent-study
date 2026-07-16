@@ -3,6 +3,7 @@ from conversation_store import (
     conversation_summary,
     delete_plan_conversations,
     load_conversation,
+    rename_plan_conversations,
     save_conversation,
 )
 from deepseek_client import ask_deepseek
@@ -13,9 +14,9 @@ from planner import (
     delete_plan,
     export_plan_markdown,
     format_plan_list,
-    clear_active_plan,
     get_active_mode,
     load_plan,
+    rename_plan_id,
     save_plan,
     set_active_state,
     write_plan,
@@ -49,7 +50,7 @@ def print_help():
 /plan-use <id>           切换当前计划
 /plan-show               查看当前计划
 /plan-next               标记当前步骤完成
-/plan-rename <id> <名称> 重命名计划
+/plan-rename <id> <名称> 重命名计划，计划 ID 也会一起改
 /plan-done <id>          标记计划完成
 /plan-archive <id>       归档计划
 /plan-export <id>        导出计划为 Markdown
@@ -195,20 +196,18 @@ def main():
             print(current_plan.current_step())
             continue
         if command.startswith("/plan-rename "):
+            save_conversation(active_plan_id(current_plan), mode, messages)
             plan_id, new_goal = parse_id_and_text(user_input, "/plan-rename")
-            plan = load_plan(plan_id)
-            if not plan:
-                print(f"没有找到计划：{plan_id}")
-                continue
             try:
-                plan.rename(new_goal)
+                plan, old_id, new_id = rename_plan_id(plan_id, new_goal)
             except ValueError as error:
                 print(f"重命名失败：{error}")
                 continue
-            write_plan(plan)
-            if current_plan and current_plan.plan_id == plan_id:
+            rename_plan_conversations(old_id, new_id)
+            if current_plan and current_plan.plan_id == old_id:
                 current_plan = plan
-            print(f"计划已重命名：{plan_id} -> {new_goal}")
+                messages = load_conversation(new_id, mode)
+            print(f"计划已重命名：{old_id} -> {new_id}（{new_goal}）")
             continue
         if command.startswith("/plan-done "):
             plan_id = user_input.removeprefix("/plan-done").strip()
