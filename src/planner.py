@@ -9,7 +9,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 PLANS_DIR = DATA_DIR / "plans"
 ACTIVE_PLAN_PATH = DATA_DIR / "active_plan.json"
+EXPORT_DIR = DATA_DIR / "plan_exports"
 DEFAULT_MODE = "teacher"
+VALID_STATUSES = {"active", "done", "archived"}
 
 
 @dataclass
@@ -29,15 +31,22 @@ class TaskPlan:
         current_index: int = 0,
         plan_id: str | None = None,
         created_at: str | None = None,
+        status: str = "active",
     ):
         self.goal = goal
         self.steps = steps
         self.current_index = current_index
         self.plan_id = plan_id or _make_plan_id(goal)
         self.created_at = created_at or datetime.now().isoformat(timespec="seconds")
+        self.status = status if status in VALID_STATUSES else "active"
 
     def show(self) -> str:
-        lines = [f"计划 ID：{self.plan_id}", f"任务目标：{self.goal}", ""]
+        lines = [
+            f"计划 ID：{self.plan_id}",
+            f"任务目标：{self.goal}",
+            f"状态：{self.status}",
+            "",
+        ]
         for index, step in enumerate(self.steps, start=1):
             if step.done:
                 status = "完成"
@@ -71,23 +80,46 @@ class TaskPlan:
 
     def complete_current(self) -> str:
         if self.is_complete():
+            self.status = "done"
             return "计划已经完成。"
 
         self.steps[self.current_index].done = True
         self.current_index += 1
 
         if self.is_complete():
+            self.status = "done"
             return "很好，这个计划已经全部完成。"
         return self.current_step()
 
+    def mark_done(self) -> None:
+        for step in self.steps:
+            step.done = True
+        self.current_index = len(self.steps)
+        self.status = "done"
+
+    def archive(self) -> None:
+        self.status = "archived"
+
+    def rename(self, new_goal: str) -> None:
+        new_goal = new_goal.strip()
+        if not new_goal:
+            raise ValueError("新计划名称不能为空。")
+        self.goal = new_goal
+
     def is_complete(self) -> bool:
         return self.current_index >= len(self.steps)
+
+    def progress_label(self) -> str:
+        if self.is_complete():
+            return "完成"
+        return f"第 {self.current_index + 1}/{len(self.steps)} 步"
 
     def to_dict(self) -> dict:
         return {
             "plan_id": self.plan_id,
             "goal": self.goal,
             "created_at": self.created_at,
+            "status": self.status,
             "current_index": self.current_index,
             "steps": [asdict(step) for step in self.steps],
         }
@@ -101,6 +133,7 @@ class TaskPlan:
             current_index=int(data.get("current_index", 0)),
             plan_id=data.get("plan_id"),
             created_at=data.get("created_at"),
+            status=data.get("status", "active"),
         )
 
 
@@ -146,12 +179,16 @@ def create_learning_plan(goal: str) -> TaskPlan:
 
 
 def save_plan(plan: TaskPlan, mode: str = DEFAULT_MODE) -> None:
+    write_plan(plan)
+    set_active_state(plan.plan_id, mode)
+
+
+def write_plan(plan: TaskPlan) -> None:
     PLANS_DIR.mkdir(parents=True, exist_ok=True)
     _plan_path(plan.plan_id).write_text(
         json.dumps(plan.to_dict(), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    set_active_state(plan.plan_id, mode)
 
 
 def load_plan(plan_id: str | None = None) -> TaskPlan | None:
@@ -195,12 +232,42 @@ def format_plan_list() -> str:
     lines = ["保存的计划："]
     for plan in plans:
         marker = "*" if plan.plan_id == active_id else " "
-        status = "完成" if plan.is_complete() else f"第 {plan.current_index + 1}/{len(plan.steps)} 步"
-        lines.append(f"{marker} {plan.plan_id} | {status} | {plan.goal}")
+        lines.append(f"{marker} {plan.plan_id} | {plan.status} | {plan.progress_label()} | {plan.goal}")
     lines.append("")
     lines.append("使用 /plan-use <id> 切换当前计划。")
     lines.append("使用 /plan-delete <id> --yes 删除计划和该计划下所有 mode 对话。")
     return "\n".join(lines)
+
+
+def export_plan_markdown(plan: TaskPlan) -> Path:
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = EXPORT_DIR / f"{plan.plan_id}.md"
+    lines = [
+        f"# {plan.goal}",
+        "",
+        f"- 计划 ID：{plan.plan_id}",
+        f"- 状态：{plan.status}",
+        f"- 创建时间：{plan.created_at}",
+        f"- 进度：{plan.progress_label()}",
+        "",
+        "## 步骤",
+        "",
+    ]
+    for index, step in enumerate(plan.steps, start=1):
+        mark = "x" if step.done else " "
+        lines.extend(
+            [
+                f"### {index}. {step.title}",
+                "",
+                f"- [{mark}] 完成",
+                f"- 目标：{step.goal}",
+                f"- 练习：{step.exercise}",
+                f"- 验收：{step.acceptance}",
+                "",
+            ]
+        )
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    return output_path
 
 
 def set_active_state(plan_id: str, mode: str) -> None:
@@ -213,22 +280,6 @@ def set_active_state(plan_id: str, mode: str) -> None:
         ),
         encoding="utf-8",
     )
-
-
-def set_active_plan_id(plan_id: str) -> None:
-    set_active_state(plan_id, get_active_mode())
-
-
-def set_active_mode(mode: str) -> None:
-    plan_id = get_active_plan_id()
-    if plan_id:
-        set_active_state(plan_id, mode)
-    else:
-        DATA_DIR.mkdir(exist_ok=True)
-        ACTIVE_PLAN_PATH.write_text(
-            json.dumps({"active_plan_id": None, "active_mode": mode}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
 
 
 def get_active_state() -> dict:

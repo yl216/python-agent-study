@@ -1,5 +1,6 @@
 from conversation_store import (
     clear_conversation,
+    conversation_summary,
     delete_plan_conversations,
     load_conversation,
     save_conversation,
@@ -10,11 +11,14 @@ from planner import (
     clear_active_plan,
     create_learning_plan,
     delete_plan,
+    export_plan_markdown,
     format_plan_list,
+    clear_active_plan,
     get_active_mode,
     load_plan,
     save_plan,
     set_active_state,
+    write_plan,
 )
 from prompts import MODE_LABELS, format_modes, get_prompt
 from settings import load_settings
@@ -38,13 +42,17 @@ def print_help():
 /mode <name>             切换模式，并加载当前计划下该模式的对话历史
 /clear                   清空当前计划 + 当前模式的对话记忆
 /tools                   查看可用本地工具
-/tool <命令>             手动调用本地工具，例如 /tool summary README.md
+/tool <命令>             手动调用本地工具
 /intent <请求>           让模型输出 JSON 意图并自动调用工具
-/plan <目标>             新建学习计划，保存为独立文件，并设为当前计划
+/plan <目标>             新建学习计划
 /plans                   查看所有保存的计划
-/plan-use <id>           切换当前计划，并加载该计划当前模式的对话历史
+/plan-use <id>           切换当前计划
 /plan-show               查看当前计划
-/plan-next               标记当前步骤完成，自动保存，并进入下一步
+/plan-next               标记当前步骤完成
+/plan-rename <id> <名称> 重命名计划
+/plan-done <id>          标记计划完成
+/plan-archive <id>       归档计划
+/plan-export <id>        导出计划为 Markdown
 /plan-reset              取消当前激活计划，不删除历史计划文件
 /plan-delete <id>        预览删除计划
 /plan-delete <id> --yes  确认删除计划和该计划下所有 mode 对话
@@ -93,6 +101,25 @@ def parse_delete_command(user_input: str) -> tuple[str, bool]:
     plan_id = parts[1]
     confirmed = len(parts) >= 3 and parts[2] == "--yes"
     return plan_id, confirmed
+
+
+def parse_id_and_text(user_input: str, command_name: str) -> tuple[str, str]:
+    rest = user_input.removeprefix(command_name).strip()
+    plan_id, _, text = rest.partition(" ")
+    return plan_id.strip(), text.strip()
+
+
+def describe_delete_impact(plan_id: str) -> str:
+    summary = conversation_summary(plan_id)
+    lines = [f"将删除计划：{plan_id}", "影响范围：", f"- 计划文件：data/plans/{plan_id}.json"]
+    if summary:
+        lines.append("- 对话历史：")
+        for mode, count in summary.items():
+            lines.append(f"  - {mode}: {count} 条消息")
+    else:
+        lines.append("- 对话历史：无")
+    lines.append(f"确认删除请再次输入：/plan-delete {plan_id} --yes")
+    return "\n".join(lines)
 
 
 def main():
@@ -167,6 +194,55 @@ def main():
             print(f"已加载该计划在 {MODE_LABELS[mode]} 模式下的 {len(messages)} 条对话消息。")
             print(current_plan.current_step())
             continue
+        if command.startswith("/plan-rename "):
+            plan_id, new_goal = parse_id_and_text(user_input, "/plan-rename")
+            plan = load_plan(plan_id)
+            if not plan:
+                print(f"没有找到计划：{plan_id}")
+                continue
+            try:
+                plan.rename(new_goal)
+            except ValueError as error:
+                print(f"重命名失败：{error}")
+                continue
+            write_plan(plan)
+            if current_plan and current_plan.plan_id == plan_id:
+                current_plan = plan
+            print(f"计划已重命名：{plan_id} -> {new_goal}")
+            continue
+        if command.startswith("/plan-done "):
+            plan_id = user_input.removeprefix("/plan-done").strip()
+            plan = load_plan(plan_id)
+            if not plan:
+                print(f"没有找到计划：{plan_id}")
+                continue
+            plan.mark_done()
+            write_plan(plan)
+            if current_plan and current_plan.plan_id == plan_id:
+                current_plan = plan
+            print(f"计划已标记完成：{plan_id}")
+            continue
+        if command.startswith("/plan-archive "):
+            plan_id = user_input.removeprefix("/plan-archive").strip()
+            plan = load_plan(plan_id)
+            if not plan:
+                print(f"没有找到计划：{plan_id}")
+                continue
+            plan.archive()
+            write_plan(plan)
+            if current_plan and current_plan.plan_id == plan_id:
+                current_plan = plan
+            print(f"计划已归档：{plan_id}")
+            continue
+        if command.startswith("/plan-export "):
+            plan_id = user_input.removeprefix("/plan-export").strip()
+            plan = load_plan(plan_id)
+            if not plan:
+                print(f"没有找到计划：{plan_id}")
+                continue
+            output_path = export_plan_markdown(plan)
+            print(f"计划已导出：{output_path.relative_to(output_path.parents[1])}")
+            continue
         if command.startswith("/plan-delete "):
             plan_id, confirmed = parse_delete_command(user_input)
             target_plan = load_plan(plan_id)
@@ -174,9 +250,7 @@ def main():
                 print(f"没有找到计划：{plan_id}")
                 continue
             if not confirmed:
-                print(f"将删除计划：{plan_id}")
-                print("这会一并删除该计划下所有 mode 的对话历史。")
-                print(f"确认删除请再次输入：/plan-delete {plan_id} --yes")
+                print(describe_delete_impact(plan_id))
                 continue
             delete_plan(plan_id)
             delete_plan_conversations(plan_id)

@@ -53,6 +53,17 @@ def clear_conversation(plan_id: str | None, mode: str) -> None:
         path.unlink()
 
 
+def conversation_summary(plan_id: str) -> dict[str, int]:
+    plan_dir = CONVERSATIONS_DIR / plan_id
+    if not plan_dir.exists():
+        return {}
+
+    summary = {}
+    for path in sorted(plan_dir.glob("*.json")):
+        summary[path.stem] = len(load_conversation(plan_id, path.stem))
+    return summary
+
+
 def delete_plan_conversations(plan_id: str) -> None:
     path = CONVERSATIONS_DIR / plan_id
     if path.exists():
