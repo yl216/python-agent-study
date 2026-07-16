@@ -42,6 +42,9 @@ python -m unittest discover -s tests
 /tools                   查看可用本地工具
 /tool <命令>             手动调用本地工具
 /intent <请求>           让模型输出 JSON 意图并自动调用工具
+/review                  复习最近学习笔记
+/quiz                    根据最近学习笔记生成练习题
+/progress                查看计划和笔记进度
 /plan <目标>             新建学习计划
 /plans                   查看所有保存的计划
 /plan-use <id>           切换当前计划

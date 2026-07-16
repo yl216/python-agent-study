@@ -8,6 +8,7 @@ from conversation_store import (
 )
 from deepseek_client import ask_deepseek
 from intent_parser import IntentParseError, parse_intent, parse_intent_locally
+from learning_assistant import build_progress, build_quiz, build_review
 from planner import (
     clear_active_plan,
     create_learning_plan,
@@ -45,6 +46,9 @@ def print_help():
 /tools                   查看可用本地工具
 /tool <命令>             手动调用本地工具
 /intent <请求>           让模型输出 JSON 意图并自动调用工具
+/review                  复习最近学习笔记
+/quiz                    根据最近学习笔记生成练习题
+/progress                查看计划和笔记进度
 /plan <目标>             新建学习计划
 /plans                   查看所有保存的计划
 /plan-use <id>           切换当前计划
@@ -165,6 +169,15 @@ def main():
             continue
         if command.startswith("/intent"):
             handle_intent_command(user_input.removeprefix("/intent").strip(), settings)
+            continue
+        if command == "/review":
+            print(build_review())
+            continue
+        if command == "/quiz":
+            print(build_quiz())
+            continue
+        if command == "/progress":
+            print(build_progress(current_plan))
             continue
         if command.startswith("/plan "):
             save_conversation(active_plan_id(current_plan), mode, messages)
